@@ -49,7 +49,7 @@ variables = {}
 patrones_globales = [
     ('DEFINE', r'^DEFINE\s+\$_[A-Z]+\w*\d*$'),                                                                          # Ej: DEFINE $_Var
     ('DP_ASIG', r'^\s*DP\s+\$_[A-Z]+\w*\s+ASIG\s+(?P<valor>.*)$'),                                                      # DP $_Var1 ASIG ...
-    ('DP_SUMA', r'^DP\s+\$_[A-Z]+\w*\s+\+\s+\$_[A-Z]+\w*\s+(([1-9][0-9]*\s*)|\$_[A-Z]+\w*)$'),                          # DP $_Var1 + ...
+    ('DP_SUMA', r'^DP\s+\$_[A-Z]+\w*\s+\+\s+(\$_[A-Z]+\w*|[0-9]+)\s+(\$_[A-Z]+\w*|[0-9]+)$'),  # DP $_Var1 + ...
     ('DP_MULTI', r'^DP\s+\$_[A-Z]+\w*\s+\*\s+\$_[A-Z]+\w*\s+(([1-9][0-9]*\s*)|\$_[A-Z]+\w*)$'),                         # DP $_Var1 * ...
     ('DP_GT', r'^DP\s+\$_[A-Z]+\w*\s+>\s+\$_[A-Z]+\w*\s+(([1-9][0-9]*\s*)|\$_[A-Z]+\w*)$'),                             # DP $_Var1 > ...
     ('DP_EQ', r'^DP\s+\$_[A-Z]+\w*\s+==\s+\$_[A-Z]+\w*\s+(([1-9][0-9]*\s*)|\$_[A-Z]+\w*)$'),                            # DP $_Var1 == ...
@@ -64,7 +64,7 @@ patrones_globales = [
 patrones_internos = [
     ('VARIABLE', r'\$_[A-Z]+\w*'),                       # Variables
     ('ASIG', r'\bASIG\b'),                               # Operador de asignación
-    ('VALOR', r'\#[^#]*\#|\b[1-9][0-9]*\b|True|False'),      # Valores (números, booleanos, strings)
+    ('VALOR', r'\#[^#]*\#|\b\d+\b|True|False'),      # Valores (números, booleanos, strings)
     ('OPERADOR', r'\+|\*|>|=='),                         # Operadores binarios
 ]
 patrones_condicionales = [
@@ -167,27 +167,26 @@ def ejecutar_comando(nombre, tokens_internos, linea_simple):
         var_dest = tokens_internos[0][1]
         var1 = tokens_internos[1][1]
         var2 = tokens_internos[2][1]
-    
-        if var_dest not in variables or var1 not in variables or var2 not in variables:
-            raise ValueError(f"Variable No Definida: Una de las variables no ha sido definida.")
-        variables[var_dest].valor = variables[var1].valor
-    
-        if var2.startswith('#') and var2.endswith('#'): 
-            valor2 = var2
-        elif isinstance(variables[var_dest].valor, bool) or isinstance(variables[var2].valor, bool):
-            raise ValueError(f"Operación no permitida: No se permite la suma de booleanos")
-        elif var2.isdigit(): 
-            valor2 = int(var2)
-        else: 
+
+        if var_dest not in variables:
+            raise ValueError(f"Variable No Definida: {var_dest}")
+        if var1.startswith('$_'):
+            if var1 not in variables:
+                raise ValueError(f"Variable No Definida: {var1}")
+            valor1 = variables[var1].valor
+        else:
+            valor1 = int(var1) 
+        if var2.startswith('$_'):
             if var2 not in variables:
                 raise ValueError(f"Variable No Definida: {var2}")
             valor2 = variables[var2].valor
-    
-        if isinstance(variables[var_dest].valor, str) or isinstance(valor2, str):
-            variables[var_dest].valor += str(valor2)
         else:
-            variables[var_dest].valor += valor2
-    
+            valor2 = int(var2) 
+        if isinstance(valor1, str) or isinstance(valor2, str):
+            variables[var_dest].valor = str(valor1) + str(valor2)
+        else:
+            variables[var_dest].valor = valor1 + valor2
+            
     elif nombre == 'DP_MULTI':
         var_dest = tokens_internos[0][1]
         var1 = tokens_internos[1][1]

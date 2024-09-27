@@ -50,9 +50,9 @@ patrones_globales = [
     ('DEFINE', r'^DEFINE\s+\$_[A-Z]+\w*\d*$'),                                                                          # Ej: DEFINE $_Var
     ('DP_ASIG', r'^\s*DP\s+\$_[A-Z]+\w*\s+ASIG\s+(?P<valor>.*)$'),                                                      # DP $_Var1 ASIG ...
     ('DP_SUMA', r'^DP\s+\$_[A-Z]+\w*\s+\+\s+(\$_[A-Z]+\w*|[0-9]+)\s+(\$_[A-Z]+\w*|[0-9]+)$'),  # DP $_Var1 + ...
-    ('DP_MULTI', r'^DP\s+\$_[A-Z]+\w*\s+\*\s+\$_[A-Z]+\w*\s+(([1-9][0-9]*\s*)|\$_[A-Z]+\w*)$'),                         # DP $_Var1 * ...
-    ('DP_GT', r'^DP\s+\$_[A-Z]+\w*\s+>\s+\$_[A-Z]+\w*\s+(([1-9][0-9]*\s*)|\$_[A-Z]+\w*)$'),                             # DP $_Var1 > ...
-    ('DP_EQ', r'^DP\s+\$_[A-Z]+\w*\s+==\s+\$_[A-Z]+\w*\s+(([1-9][0-9]*\s*)|\$_[A-Z]+\w*)$'),                            # DP $_Var1 == ...
+    ('DP_MULTI', r'^DP\s+\$_[A-Z]+\w*\s+\*\s+(\$_[A-Z]+\w*|\d+)\s+(\$_[A-Z]+\w*|\d+)$'),  # DP $_Var1 * ...
+    ('DP_GT', r'^DP\s+\$_[A-Z]+\w*\s+>\s+(\$_[A-Z]+\w*|\d+)\s+(\$_[A-Z]+\w*|\d+)$'),  # DP $_Var1 > ...
+    ('DP_EQ', r'^DP\s+\$_[A-Z]+\w*\s+==\s+(\$_[A-Z]+\w*|\d+)\s+(\$_[A-Z]+\w*|\d+)$'),  # DP $_Var1 == ...
     ('MOSTRAR', r'^MOSTRAR\s*\(\$_[A-Z]+\w*\)'),                                                                           # Ej: MOSTRAR($_Var)
     ('CONDICIONAL', r'^if\s*\((?P<condicion>[^)]+)\)\s*\{(?P<codigo_if>.*?)\}(?:\s*else\s*\{(?P<codigo_else>.*?)\})?$'),  # if-else completo
     ('IF', r'^if\s*\([^)]+\)\s*\{'),
@@ -189,88 +189,72 @@ def ejecutar_comando(nombre, tokens_internos, linea_simple):
             
     elif nombre == 'DP_MULTI':
         var_dest = tokens_internos[0][1]
-        var1 = tokens_internos[1][1]
-        var2 = tokens_internos[2][1]
-
-        if var_dest not in variables or var1 not in variables or var2 not in variables:
-            raise ValueError(f"Variable No Definida: Una de las variables no ha sido definida.")
-        variables[var_dest].valor = variables[var1].valor
-        
-        if isinstance(variables[var_dest].valor, bool) or isinstance(variables[var2].valor, bool):
-            raise ValueError(f"Operación no permitida: No se puede multiplicar un valor booleano")
-        
-        if var2.startswith('#') and var2.endswith('#'): 
-            raise ValueError(f"Operación no permitida: No se puede multiplicar un string por un valor")
-        
-        elif var2.isdigit(): 
-            valor2 = int(var2)
-        
-        else: 
-            if var2 not in variables:
-                raise ValueError(f"Variable No Definida: {var2}")
-            valor2 = variables[var2].valor
-
-        variables[var_dest].valor *= valor2
+        op1 = tokens_internos[1][1]
+        op2 = tokens_internos[2][1]
+        if var_dest not in variables:
+            raise ValueError(f"Variable No Definida: {var_dest}")
+        if op1.startswith('$_'):
+            if op1 not in variables:
+                raise ValueError(f"Variable No Definida: {op1}")
+            valor1 = variables[op1].valor
+        else:
+            valor1 = int(op1) 
+        if op2.startswith('$_'):
+            if op2 not in variables:
+                raise ValueError(f"Variable No Definida: {op2}")
+            valor2 = variables[op2].valor
+        else:
+            valor2 = int(op2)
+        if isinstance(valor1, bool) or isinstance(valor2, bool):
+            raise ValueError(f"Operación no permitida: No se puede multiplicar valores booleanos")
+        variables[var_dest].valor = valor1 * valor2
 
     elif nombre == 'DP_GT':
         var_dest = tokens_internos[0][1]
         var1 = tokens_internos[1][1]
         var2 = tokens_internos[2][1]
 
-        if var_dest not in variables or var1 not in variables or var2 not in variables:
-            raise ValueError(f"Variable No Definida: Una de las variables no ha sido definida.")
-
-        # Asignar el valor de var1 a var_dest
-        variables[var_dest].valor = variables[var1].valor
-
-        # Comparar var2 con var_dest
-        if var2.startswith('#') and var2.endswith('#'): 
-            raise ValueError(f"Operación no permitida: Solo se puede comparar valores de tipo entero.")
-        
-        elif isinstance(variables[var_dest].valor, bool) or isinstance(variables[var2].valor, bool):
-            raise ValueError(f"Operación no permitida: Solo se puede comparar valores de tipo entero.")
-        
-        elif var2.isdigit(): 
-            valor2 = int(var2)
-        
-        else: 
+        if var_dest not in variables:
+            raise ValueError(f"Variable No Definida: {var_dest}")
+        if var1.startswith('$_'):
+            if var1 not in variables:
+                raise ValueError(f"Variable No Definida: {var1}")
+            valor1 = variables[var1].valor
+        else:
+            valor1 = int(var1) 
+        if var2.startswith('$_'):
             if var2 not in variables:
                 raise ValueError(f"Variable No Definida: {var2}")
             valor2 = variables[var2].valor
-
-        if not isinstance(variables[var_dest].valor, int) or not isinstance(valor2, int):
-            raise ValueError(f"Operación no permitida: No se puede comparar un valor no entero")
-
-        variables[var_dest].valor = variables[var_dest].valor > valor2
-
+        else:
+            valor2 = int(var2) 
+        if not isinstance(valor1, int) or not isinstance(valor2, int):
+            raise ValueError(f"Operación no permitida: Solo se pueden comparar valores enteros")
+        variables[var_dest].valor = valor1 > valor2
+        
     elif nombre == 'DP_EQ':
         var_dest = tokens_internos[0][1]
         var1 = tokens_internos[1][1]
         var2 = tokens_internos[2][1]
 
-        if var_dest not in variables or var1 not in variables or var2 not in variables:
-            raise ValueError(f"Variable No Definida: Una de las variables no ha sido definida.")
-        # Asignar el valor de var1 a var_dest
-        variables[var_dest].valor = variables[var1].valor
-        if isinstance(variables[var_dest].valor, bool) or isinstance(variables[var2].valor, bool):
-            raise ValueError(f"Operación no permitida: No se puede comparar valores de tipo booleano")
-        # Comparar var2 con var_dest
-        if var2.startswith('#') and var2.endswith('#'):  # string value
-            valor2 = var2
-        elif var2.isdigit():  # integer value
-            valor2 = int(var2)
-        else:  # assume it's a variable
+        if var_dest not in variables:
+            raise ValueError(f"Variable No Definida: {var_dest}")
+        if var1.startswith('$_'):
+            if var1 not in variables:
+                raise ValueError(f"Variable No Definida: {var1}")
+            valor1 = variables[var1].valor
+        else:
+            valor1 = int(var1) if var1.isdigit() else var1 
+        if var2.startswith('$_'):
             if var2 not in variables:
                 raise ValueError(f"Variable No Definida: {var2}")
             valor2 = variables[var2].valor
-
-        if isinstance(variables[var_dest].valor, str) and isinstance(valor2, str):
-            variables[var_dest].valor = variables[var_dest].valor == valor2
-        elif isinstance(variables[var_dest].valor, int) and isinstance(valor2, int):
-            variables[var_dest].valor = variables[var_dest].valor == valor2
         else:
-            raise ValueError(f"Operación no permitida: No se puede comparar valores de tipos diferentes")
-
+            valor2 = int(var2) if var2.isdigit() else var2 
+        if type(valor1) != type(valor2):
+              raise ValueError(f"Operación no permitida: No se pueden comparar valores de tipos diferentes")
+        variables[var_dest].valor = valor1 == valor2
+        
     elif nombre == 'MOSTRAR':
         var_name = tokens_internos[0][1]
         if var_name not in variables:
